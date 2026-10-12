@@ -104,6 +104,17 @@ def client(search_html, diary_html):
         "GET", "food/note", FakeResponse(json_data={"item": {"body": "hello world"}})
     )
     fake.session.route("POST", "food/note", FakeResponse(status_code=200))
+    fake.session.route(
+        "GET", "api/auth/csrf", FakeResponse(json_data={"csrfToken": "NEXTCSRF"})
+    )
+    fake.session.route(
+        "POST",
+        "api/services/diary",
+        FakeResponse(
+            status_code=201,
+            json_data=[{"id": "qa-1", "meal_name": "Snacks", "type": "quick_add"}],
+        ),
+    )
     return fake
 
 

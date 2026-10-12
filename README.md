@@ -119,6 +119,7 @@ Then use the same `--from 'mfp-mcp[autorefresh]'` form in your client config
 | `fitness_search_food` | Candidate matches with brand, calories, macros, serving, and ids |
 | `fitness_draft_food` | Numbered options with every serving size, filtered/ranked by optional calorie and macro targets |
 | `fitness_log_food` | Log a draft option (and serving), a remembered food, or exact ids to the real diary |
+| `fitness_quick_add` | Quick Add a macros-only entry (calories + optional carbs/fat/protein), no database food |
 | `fitness_list_food_pins` | Remembered query → food/serving choices (local) |
 | `fitness_clear_food_pin` | Forget one remembered choice, or all of them |
 | `fitness_delete_food` | Remove a diary entry by name match |

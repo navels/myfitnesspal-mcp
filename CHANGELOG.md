@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `fitness_quick_add` logs a macros-only Quick Add entry (calories, and
+  optional carbs/fat/protein) to any meal, matching MyFitnessPal's own Quick
+  Add. It posts to `/api/services/diary` with the NextAuth csrf token, the
+  same call the web app makes.
+
 ## [0.4.1] - 2026-09-30
 
 ### Added

@@ -701,3 +701,80 @@ def delete_exercise(client, day: date, query: str, all_matches: bool = False) ->
     for entry in targets:
         remove_exercise_entry(client, entry["entry_id"], token)
     return {"day": day.isoformat(), "removed": targets, "count": len(targets)}
+
+
+def nextauth_csrf(client) -> str:
+    """The NextAuth CSRF token the web app sends on /api/services/* writes.
+
+    This is a different token from the diary page's ``csrf-token`` meta tag used
+    by the legacy /food/* writes; Quick Add goes through the newer
+    /api/services/diary endpoint, which validates this one. Fetched from
+    /api/auth/csrf, the same call the web app makes.
+    """
+    resp = client.session.get(
+        parse.urljoin(client.BASE_URL_SECURE, "api/auth/csrf"),
+        headers={"Accept": "application/json"},
+    )
+    resp.raise_for_status()
+    token = resp.json().get("csrfToken")
+    if not token:
+        raise RuntimeError("couldn't read the MyFitnessPal NextAuth csrf token")
+    return token
+
+
+def quick_add(
+    client,
+    day: date,
+    meal: str,
+    calories: float,
+    carbs: float = 0.0,
+    fat: float = 0.0,
+    protein: float = 0.0,
+    page: tuple | None = None,
+) -> dict:
+    """Log a macros-only "Quick Add" entry, with no database food.
+
+    Replicates the web app's Quick Add screen: POST /api/services/diary with a
+    ``type: "quick_add"`` item, authenticated by the NextAuth csrf token and the
+    session cookie. ``meal`` is resolved to the account's configured meal name.
+    """
+    doc, _ = page or diary_page(client, day)
+    _, meal_name = resolve_meal(doc, meal)
+    csrf = nextauth_csrf(client)
+    item = {
+        "meal_name": meal_name,
+        "date": day.isoformat(),
+        "nutritional_contents": {
+            "fat": fat,
+            "carbohydrates": carbs,
+            "protein": protein,
+            "energy": {"value": calories, "unit": "calories"},
+        },
+        "type": "quick_add",
+    }
+    resp = client.session.post(
+        parse.urljoin(client.BASE_URL_SECURE, "api/services/diary"),
+        json={"items": [item]},
+        headers={
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrf,
+            "Origin": "https://www.myfitnesspal.com",
+            "Referer": food_diary_url(client),
+        },
+    )
+    if resp.status_code not in (200, 201):
+        raise RuntimeError(
+            f"MyFitnessPal /api/services/diary returned HTTP {resp.status_code}"
+        )
+    created = resp.json()
+    entries = created if isinstance(created, list) else created.get("items", [])
+    entry = entries[0] if entries else {}
+    return {
+        "meal": entry.get("meal_name", meal_name),
+        "entry_id": entry.get("id"),
+        "calories": calories,
+        "carbs": carbs,
+        "fat": fat,
+        "protein": protein,
+    }

@@ -269,3 +269,29 @@ def test_log_water_tool_updates_remote_and_local_total(
     assert result["ok"] is True
     assert result["water_ml"] == 1200.0
     assert local_store.day_record("2026-07-08")["nutrition"]["water_ml"] == 1200.0
+
+
+def test_quick_add_tool_logs_macros_only_entry(connected, local_store):
+    result = asyncio.run(
+        server.fitness_quick_add(
+            calories=790,
+            meal="lunch",
+            carbs=61,
+            fat=45,
+            protein=33,
+            date="2026-07-08",
+        )
+    )
+    assert result["ok"] is True
+    assert result["entry_id"] == "qa-1"
+    _, url, kwargs = connected.session.calls[-1]
+    assert "api/services/diary" in url
+    item = kwargs["json"]["items"][0]
+    assert item["type"] == "quick_add"
+    assert item["nutritional_contents"]["energy"]["value"] == 790
+
+
+def test_quick_add_tool_defaults_to_breakfast(connected):
+    asyncio.run(server.fitness_quick_add(calories=120))
+    item = connected.session.calls[-1][2]["json"]["items"][0]
+    assert item["meal_name"] == "Breakfast"

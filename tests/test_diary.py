@@ -614,3 +614,45 @@ def test_log_water_rejects_negative_replace_before_network_call(client):
     with pytest.raises(ValueError, match="can't be negative"):
         diary.log_water(client, TODAY, -1, "cup", replace=True)
     assert client.session.calls == []
+
+
+def test_nextauth_csrf_reads_token(client):
+    assert diary.nextauth_csrf(client) == "NEXTCSRF"
+
+
+def test_quick_add_posts_macros_only_entry(client):
+    result = diary.quick_add(client, TODAY, "snacks", 790, carbs=61, fat=45, protein=33)
+
+    method, url, kwargs = client.session.calls[-1]
+    assert method == "POST"
+    assert "api/services/diary" in url
+    item = kwargs["json"]["items"][0]
+    assert item["meal_name"] == "Snacks"
+    assert item["date"] == "2026-07-08"
+    assert item["type"] == "quick_add"
+    assert item["nutritional_contents"] == {
+        "fat": 45,
+        "carbohydrates": 61,
+        "protein": 33,
+        "energy": {"value": 790, "unit": "calories"},
+    }
+    assert kwargs["headers"]["X-CSRF-Token"] == "NEXTCSRF"
+    assert kwargs["headers"]["Content-Type"] == "application/json"
+    assert result["entry_id"] == "qa-1"
+    assert result["meal"] == "Snacks"
+    assert result["calories"] == 790
+
+
+def test_quick_add_defaults_macros_to_zero(client):
+    diary.quick_add(client, TODAY, "breakfast", 150)
+    item = client.session.calls[-1][2]["json"]["items"][0]
+    assert item["meal_name"] == "Breakfast"
+    assert item["nutritional_contents"]["carbohydrates"] == 0.0
+    assert item["nutritional_contents"]["fat"] == 0.0
+    assert item["nutritional_contents"]["protein"] == 0.0
+
+
+def test_quick_add_rejects_unknown_meal(client):
+    with pytest.raises(diary.UnknownMeal):
+        diary.quick_add(client, TODAY, "brunch", 100)
+    assert all("api/services/diary" not in url for _, url, _ in client.session.calls)

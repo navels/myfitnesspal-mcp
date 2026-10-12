@@ -401,6 +401,37 @@ async def fitness_log_water(
 
 
 @mcp.tool()
+async def fitness_quick_add(
+    calories: float,
+    meal: str | None = None,
+    carbs: float = 0.0,
+    fat: float = 0.0,
+    protein: float = 0.0,
+    date: str | None = None,
+    ctx: Context = None,
+) -> dict:
+    """Quick Add a macros-only entry to the diary, with no database food.
+
+    This is MyFitnessPal's "Quick Add" — use it when you know the numbers but
+    don't want to pick a specific food, e.g. restaurant meals or leftovers
+    logged by their totals. For a real food with a name, use fitness_log_food.
+
+    calories: energy in kcal. carbs, fat, protein: grams (default 0).
+    meal: breakfast|lunch|dinner|snacks (default breakfast) or any meal name on
+    the account. date: YYYY-MM-DD (default: today).
+    """
+    day = parse_day(date)
+
+    def op(store, client):
+        return diary.quick_add(
+            client, day, meal or "breakfast", calories, carbs, fat, protein
+        )
+
+    result = await with_session(ctx, op)
+    return {"ok": True, **result, **await refresh_after_write(ctx, day)}
+
+
+@mcp.tool()
 async def fitness_get_exercise(date: str | None = None, ctx: Context = None) -> dict:
     """Read the MyFitnessPal exercise diary (cardio + strength) for a day.
 
