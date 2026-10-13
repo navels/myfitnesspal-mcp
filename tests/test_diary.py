@@ -656,3 +656,43 @@ def test_quick_add_rejects_unknown_meal(client):
     with pytest.raises(diary.UnknownMeal):
         diary.quick_add(client, TODAY, "brunch", 100)
     assert all("api/services/diary" not in url for _, url, _ in client.session.calls)
+
+
+# Real MyFitnessPal markup: a database food carries data-food-entry-id on a "#"
+# anchor, while a Quick Add has no such attribute and its id lives only in the
+# /food/remove/ (and /food/quick_add/) links.
+MIXED_DIARY = (
+    "<html><head><meta name='csrf-token' content='TOK'></head><body><table>"
+    "<tr class='meal_header'><td>Breakfast</td></tr>"
+    "<tr class='meal_header'><td>Lunch</td></tr>"
+    "<tr class='meal_header'><td>Dinner</td></tr>"
+    "<tr><td class='first alt'>"
+    "<a href='/food/quick_add/900100'>Quick Add, 1 serving(s)</a></td>"
+    "<td>1,354</td>"
+    "<td><a href='/food/remove/900100?date=2026-07-08'>x</a></td></tr>"
+    "<tr><td class='first alt'>"
+    "<a href='#' data-food-entry-id='900200'>Chicken Salad</a></td>"
+    "<td>300</td>"
+    "<td><a href='/food/remove/900200?date=2026-07-08'>x</a></td></tr>"
+    "<tr class='meal_header'><td>Snacks</td></tr>"
+    "</table></body></html>"
+)
+
+
+def test_diary_entries_reads_quick_add_rows():
+    doc = lh.fromstring(MIXED_DIARY)
+    entries = diary.diary_entries(doc)
+    assert [(e["meal"], e["entry_id"], e["name"]) for e in entries] == [
+        ("dinner", "900100", "Quick Add, 1 serving(s)"),
+        ("dinner", "900200", "Chicken Salad"),
+    ]
+
+
+def test_delete_food_removes_a_quick_add_entry(client, make_response):
+    client.session.route("GET", "food/diary?date=", make_response(text=MIXED_DIARY))
+    result = diary.delete_food(client, TODAY, "Quick Add", "dinner")
+
+    assert result == {"removed": "Quick Add, 1 serving(s)", "meal": "dinner"}
+    method, url, _ = client.session.calls[-1]
+    assert method == "POST"
+    assert "food/remove/900100" in url

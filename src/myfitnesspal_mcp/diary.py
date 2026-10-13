@@ -7,6 +7,7 @@ authenticate with the session's Bearer token plus mfp-* client headers and the
 page csrf token.
 """
 
+import re
 from datetime import date
 from html import unescape
 from urllib import parse
@@ -326,6 +327,28 @@ def diary_page(client, day: date):
     return doc, tokens[0]
 
 
+def _remove_entry_id(row) -> str | None:
+    """The diary entry id from a row's remove link, present on every logged
+    entry including Quick Adds (which carry no data-food-entry-id anchor)."""
+    for href in row.xpath('.//a[contains(@href, "/food/remove/")]/@href'):
+        match = re.search(r"/food/remove/(\d+)", href)
+        if match:
+            return match.group(1)
+    return None
+
+
+def _row_entry_name(row) -> str:
+    """The displayed name of a diary row: the first anchor with text that isn't
+    the remove link (the food name, or 'Quick Add, …' for a Quick Add)."""
+    for anchor in row.xpath(".//a"):
+        if "/food/remove/" in (anchor.get("href") or ""):
+            continue
+        text = anchor.text_content().strip()
+        if text:
+            return text
+    return ""
+
+
 def diary_entries(doc) -> list[dict]:
     entries = []
     current_meal = None
@@ -342,6 +365,18 @@ def diary_entries(doc) -> list[dict]:
                     "entry_id": anchors[0].get("data-food-entry-id"),
                     "meal": current_meal,
                     "name": anchors[0].text_content().strip(),
+                }
+            )
+            continue
+        # Quick Add rows have no data-food-entry-id anchor; their id lives only
+        # in the remove link. Fall back to that so they can be found and removed.
+        entry_id = _remove_entry_id(row)
+        if entry_id:
+            entries.append(
+                {
+                    "entry_id": entry_id,
+                    "meal": current_meal,
+                    "name": _row_entry_name(row),
                 }
             )
     return entries

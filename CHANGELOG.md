@@ -13,6 +13,13 @@ All notable changes to this project are documented here. The format follows
   Add. It posts to `/api/services/diary` with the NextAuth csrf token, the
   same call the web app makes.
 
+### Fixed
+
+- `fitness_delete_food` and `fitness_modify_food` now find Quick Add entries.
+  Quick Add rows carry no `data-food-entry-id` anchor, so the diary parser
+  skipped them and reported "nothing logged"; it now falls back to the entry
+  id in the row's remove link, which every logged entry has.
+
 ## [0.4.1] - 2026-09-30
 
 ### Added
